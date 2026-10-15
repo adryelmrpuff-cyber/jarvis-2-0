@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07111f">
+<title>Jarvis 1.0</title>
+<style>
+:root{color-scheme:dark;--cyan:#55dfff;--muted:#91a9bd}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 35%,#12314a 0,#07111f 45%,#03070d 100%);font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#edf8ff;display:flex;justify-content:center}
+main{width:min(100%,560px);min-height:100vh;padding:28px 20px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center}
+.brand{font-size:12px;letter-spacing:.38em;color:var(--cyan);margin-top:16px}
+h1{font-weight:500;letter-spacing:.16em;font-size:34px;margin:8px 0 4px}
+.sub{color:var(--muted);font-size:14px;text-align:center}
+.orb-wrap{margin:46px 0 26px;position:relative;width:210px;height:210px;display:grid;place-items:center}
+.orb{width:145px;height:145px;border-radius:50%;border:1px solid #72e6ff;background:radial-gradient(circle at 35% 30%,#a8f5ff 0,#2aa4ce 12%,#0a4268 42%,#061322 72%);box-shadow:0 0 25px #24c8ff77,inset 0 0 28px #5ce6ff77;animation:pulse 3s infinite}
+.ring{position:absolute;border:1px solid #55dfff66;border-radius:50%;inset:6px;animation:spin 18s linear infinite}
+.ring:after{content:"";position:absolute;width:8px;height:8px;border-radius:50%;background:#a8f5ff;top:22px;left:26px;box-shadow:0 0 12px #55dfff}
+.ring.two{inset:24px;animation-direction:reverse;animation-duration:12s;border-style:dashed}
+@keyframes pulse{50%{box-shadow:0 0 42px #24c8ffbb,inset 0 0 35px #5ce6ff99;transform:scale(1.035)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.status{color:var(--cyan);font-size:13px;letter-spacing:.12em;min-height:22px;text-align:center}
+button{font:inherit;cursor:pointer}
+.mic{margin-top:16px;border:1px solid #55dfff;background:linear-gradient(135deg,#123d59,#071a2a);color:white;border-radius:999px;padding:15px 25px;min-width:190px;font-weight:600;box-shadow:0 0 20px #1dbde733}
+.mic:active{transform:scale(.98)}
+.mic.listening{background:#7a2331;border-color:#ff8d9d}
+.panel{width:100%;margin-top:28px;padding:18px;border:1px solid #25445b;border-radius:18px;background:#06111dcc}
+.label{font-size:11px;letter-spacing:.16em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+.output{min-height:48px;line-height:1.5;overflow-wrap:anywhere}
+.userline{color:#b4c7d6}
+.controls{display:flex;gap:10px;width:100%;margin-top:14px}
+.small{flex:1;background:#0a1b2b;border:1px solid #29465c;color:#d9f4ff;padding:11px;border-radius:12px;font-size:13px}
+.note{margin-top:auto;padding-top:28px;text-align:center;color:#7891a5;font-size:11px;line-height:1.5}
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">SISTEMA PESSOAL DE INTELIGÊNCIA</div>
+  <h1>JARVIS</h1>
+  <div class="sub">Assistente pessoal · Versão inicial 1.0</div>
+  <div class="orb-wrap" aria-hidden="true"><div class="ring"></div><div class="ring two"></div><div class="orb"></div></div>
+  <div class="status" id="status">SISTEMA PRONTO</div>
+  <button class="mic" id="mic">🎙 FALAR COM JARVIS</button>
+  <section class="panel">
+    <div class="label">O que o senhor disse</div>
+    <div class="output userline" id="heard">Aguardando seu comando...</div>
+    <div class="label" style="margin-top:18px">Jarvis</div>
+    <div class="output" id="reply">À disposição, senhor. Toque no botão e fale comigo.</div>
+  </section>
+  <div class="controls">
+    <button class="small" id="repeat">🔊 Repetir resposta</button>
+    <button class="small" id="stop">■ Parar voz</button>
+  </div>
+  <div class="note">A versão inicial usa os recursos de voz do navegador. O reconhecimento de fala pode exigir internet e permissão do microfone.</div>
+</main>
+<script>
+const statusEl=document.getElementById('status'), mic=document.getElementById('mic');
+const heardEl=document.getElementById('heard'), replyEl=document.getElementById('reply');
+let lastReply='À disposição, senhor. Toque no botão e fale comigo.';
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let recognition=null, speaking=false;
+function setStatus(t){statusEl.textContent=t}
+function speak(text){
+  lastReply=text;
+  if(!('speechSynthesis' in window)){setStatus('VOZ INDISPONÍVEL NESTE NAVEGADOR');return}
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);u.lang='pt-BR';u.rate=0.92;u.pitch=0.88;
+  const voices=window.speechSynthesis.getVoices();
+  const voice=voices.find(v=>v.lang&&v.lang.toLowerCase().startsWith('pt-br'))||voices.find(v=>v.lang&&v.lang.toLowerCase().startsWith('pt'));
+  if(voice)u.voice=voice;
+  u.onstart=()=>{speaking=true;setStatus('JARVIS RESPONDENDO')};
+  u.onend=()=>{speaking=false;setStatus('SISTEMA PRONTO')};
+  u.onerror=()=>{speaking=false;setStatus('PRONTO')};
+  window.speechSynthesis.speak(u);
+}
+function respond(raw){
+ const s=raw.toLowerCase().trim(); let r;
+ if(/\b(oi|olá|ola|bom dia|boa tarde|boa noite|e aí|eai)\b/.test(s)) r='Olá, senhor. Jarvis está à disposição. Como posso ajudá-lo?';
+ else if(s.includes('seu nome')||s.includes('quem é você')||s.includes('quem e voce')) r='Sou o Jarvis, seu assistente pessoal. Esta é minha primeira versão de testes, senhor.';
+ else if(s.includes('hora')) r='Para consultar a hora exata, senhor, confira o relógio do seu celular. Ainda não conectamos essa função.';
+ else if(s.includes('obrigado')||s.includes('obrigada')) r='Sempre à disposição, senhor.';
+ else if(s.includes('parar')||s.includes('silêncio')||s.includes('silencio')) r='Entendido, senhor. Ficarei em silêncio até o próximo comando.';
+ else if(s.includes('como você está')||s.includes('como voce esta')) r='Todos os sistemas iniciais estão prontos, senhor. Ainda estamos em fase de desenvolvimento.';
+ else r='Entendi, senhor. Nesta versão inicial ainda não conectamos a inteligência artificial. O próximo passo será integrar a IA para eu poder responder melhor aos seus comandos.';
+ replyEl.textContent=r;speak(r);
+}
+function startListening(){
+ if(!SR){setStatus('NAVEGADOR SEM RECONHECIMENTO DE VOZ');replyEl.textContent='Senhor, tente abrir este arquivo no Google Chrome do Android. Se continuar, usaremos outra forma de reconhecimento.';return}
+ if(speaking)window.speechSynthesis.cancel();
+ try{
+  recognition=new SR(); recognition.lang='pt-BR'; recognition.interimResults=false; recognition.maxAlternatives=1;
+  recognition.onstart=()=>{mic.classList.add('listening');mic.textContent='🎙 ESTOU OUVINDO...';setStatus('PODE FALAR, SENHOR')};
+  recognition.onresult=e=>{const text=e.results[0][0].transcript;heardEl.textContent=text;setStatus('PROCESSANDO COMANDO');respond(text)};
+  recognition.onerror=e=>{setStatus('NÃO CONSEGUI OUVIR');replyEl.textContent=e.error==='not-allowed'?'Permita o acesso ao microfone nas configurações do navegador, senhor.':'Não consegui reconhecer a fala. Toque no botão e tente novamente, senhor.'};
+  recognition.onend=()=>{mic.classList.remove('listening');mic.textContent='🎙 FALAR COM JARVIS';if(!speaking)setStatus('SISTEMA PRONTO')};
+  recognition.start();
+ }catch(e){setStatus('TOQUE PARA TENTAR NOVAMENTE')}
+}
+mic.addEventListener('click',startListening);
+document.getElementById('repeat').addEventListener('click',()=>speak(lastReply));
+document.getElementById('stop').addEventListener('click',()=>{window.speechSynthesis.cancel();speaking=false;setStatus('SISTEMA PRONTO')});
+if('speechSynthesis' in window)window.speechSynthesis.getVoices();
+</script>
+</body>
+</html>
